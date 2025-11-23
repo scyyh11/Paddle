@@ -68,6 +68,9 @@ The MPS backend follows the same design pattern as other device backends in Padd
 - **EmplaceDeviceContexts**: MPS contexts are created on-demand
 - **Operator Execution**: Operators can run on MPS devices with automatic fallback to CPU
 - **Kernel Fallback**: Automatic fallback to CPU kernels when MPS-specific kernels are not available
+- **Execution Modes**: 
+  - **Dygraph/Eager Mode**: Fully supported via `eager.cc`, `imperative.cc`, `eager_math_op_patch.cc`
+  - **Static Graph Mode**: Fully supported via `operator.cc` (old executor) and `interpreter_base_impl.h` (new executor)
 - **Python API**: `is_compiled_with_mps()`, `paddle.device.mps.device_count()`, `paddle.device.mps.synchronize()`
 
 ## Compilation
@@ -169,11 +172,15 @@ MPS uses unified memory architecture (MTLResourceStorageModeShared), meaning:
 - `paddle/phi/backends/context_pool.h` / `context_pool.cc` - Context pool integration
 - `paddle/phi/core/platform/device_context.cc` - Context creation
 - `paddle/phi/core/memory/memcpy.cc` - Memory copy integration
-- `paddle/fluid/framework/operator.cc` - Operator execution with MPS fallback
+- `paddle/fluid/framework/operator.cc` - Operator execution with MPS fallback (old executor)
+- `paddle/fluid/framework/new_executor/interpreter_base_impl.h` - New executor device management
+- `paddle/fluid/framework/new_executor/interpreter/execution_config.cc` - New executor thread pool config
 - `paddle/fluid/framework/phi_utils.cc` - Kernel fallback mechanism
 - `paddle/phi/core/kernel_factory.cc` - Kernel selection with MPS fallback
 - `paddle/fluid/pybind/pybind.cc` - Python bindings
-- `paddle/fluid/pybind/eager.cc` - Eager execution bindings
+- `paddle/fluid/pybind/eager.cc` - Eager/dygraph execution bindings
+- `paddle/fluid/pybind/imperative.cc` - Imperative mode bindings
+- `paddle/fluid/pybind/eager_math_op_patch.cc` - Eager math operations
 - `python/paddle/device/mps/__init__.py` - Python device API
 
 ### Build System

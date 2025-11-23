@@ -36,6 +36,9 @@
 #include "paddle/phi/backends/device_manager.h"
 #include "paddle/phi/core/memory/allocation/spin_lock.h"
 #include "paddle/phi/core/platform/device_event.h"
+#ifdef PADDLE_WITH_MPS
+#include "paddle/phi/backends/mps/mps_info.h"
+#endif
 
 COMMON_DECLARE_bool(new_executor_serial_run);
 PD_DECLARE_bool(new_executor_static_build);
@@ -146,6 +149,16 @@ inline void SetDeviceId(const phi::Place& place) {
 #else
     auto dev_id = place.device;
     platform::SetXPUDeviceId(dev_id);
+#endif
+  } else if (phi::is_mps_place(place)) {
+#ifndef PADDLE_WITH_MPS
+    PADDLE_THROW(common::errors::Unavailable(
+        "Cannot run operator on place %s, please recompile paddle or "
+        "reinstall Paddle with MPS support.",
+        place));
+#else
+    auto dev_id = place.device;
+    phi::backends::mps::SetDeviceId(dev_id);
 #endif
   } else if (phi::is_custom_place(place)) {
 #ifndef PADDLE_WITH_CUSTOM_DEVICE

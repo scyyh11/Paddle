@@ -22,6 +22,9 @@
 #include "paddle/phi/backends/device_manager.h"
 #include "paddle/phi/backends/gpu/gpu_info.h"
 #include "paddle/phi/backends/xpu/xpu_info.h"
+#ifdef PADDLE_WITH_MPS
+#include "paddle/phi/backends/mps/mps_info.h"
+#endif
 #include "paddle/utils/string/string_helper.h"
 
 // FLAGS_force_sync_ops is used to finer control the op-sync in executor.
@@ -73,6 +76,11 @@ inline std::tuple<int, int> GetThreadPoolConfig(const phi::Place& place,
       if (phi::is_xpu_place(place)) {
 #if defined(PADDLE_WITH_XPU)
         device_count = phi::backends::xpu::GetXPUDeviceCount();
+#endif
+      }
+      if (phi::is_mps_place(place)) {
+#if defined(PADDLE_WITH_MPS)
+        device_count = phi::backends::mps::GetMPSDeviceCount();
 #endif
       }
       if (phi::is_ipu_place(place)) {

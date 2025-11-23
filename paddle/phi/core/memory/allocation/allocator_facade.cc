@@ -29,6 +29,11 @@
 #include "paddle/phi/core/memory/allocation/stat_allocator.h"
 #include "paddle/phi/core/platform/device_context.h"
 
+#ifdef PADDLE_WITH_MPS
+#include "paddle/phi/core/memory/allocation/mps_allocator.h"
+#include "paddle/phi/backends/mps/mps_info.h"
+#endif
+
 #if defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)
 #include <shared_mutex>
 #include <utility>
@@ -310,6 +315,11 @@ class AllocatorFacadePrivate {
           InitNaiveBestFitIPUAllocator(phi::IPUPlace(dev_id));
         }
 #endif
+#ifdef PADDLE_WITH_MPS
+        for (int dev_id = 0; dev_id < phi::backends::mps::GetMPSDeviceCount(); ++dev_id) {
+          InitNaiveBestFitMPSAllocator(phi::MPSPlace(dev_id));
+        }
+#endif
 #ifdef PADDLE_WITH_CUSTOM_DEVICE
         auto device_types = phi::DeviceManager::GetAllCustomDeviceTypes();
         for (const auto& dev_type : device_types) {
@@ -338,6 +348,11 @@ class AllocatorFacadePrivate {
 #ifdef PADDLE_WITH_IPU
         for (int dev_id = 0; dev_id < platform::GetIPUDeviceCount(); ++dev_id) {
           InitNaiveBestFitIPUAllocator(phi::IPUPlace(dev_id));
+        }
+#endif
+#ifdef PADDLE_WITH_MPS
+        for (int dev_id = 0; dev_id < phi::backends::mps::GetMPSDeviceCount(); ++dev_id) {
+          InitNaiveBestFitMPSAllocator(phi::MPSPlace(dev_id));
         }
 #endif
 #if defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)
@@ -1350,6 +1365,12 @@ class AllocatorFacadePrivate {
   }
 #endif
 
+#ifdef PADDLE_WITH_MPS
+  void InitNaiveBestFitMPSAllocator(phi::MPSPlace p) {
+    allocators_[p] = std::make_shared<MPSAllocator>(p);
+  }
+#endif
+
 #ifdef PADDLE_WITH_CUSTOM_DEVICE
   void InitNaiveBestFitCustomDeviceAllocator(phi::CustomPlace p) {
     allocators_[p] = std::make_shared<NaiveBestFitAllocator>(p);
@@ -1456,6 +1477,13 @@ class AllocatorFacadePrivate {
       system_allocators_[p] = std::make_shared<NaiveBestFitAllocator>(p);
     }
 #endif
+#ifdef PADDLE_WITH_MPS
+    int device_count = phi::backends::mps::GetMPSDeviceCount();
+    for (int i = 0; i < device_count; ++i) {
+      phi::MPSPlace p(i);
+      system_allocators_[p] = std::make_shared<MPSAllocator>(p);
+    }
+#endif
 #if defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)
     system_allocators_[phi::GPUPinnedPlace()] =
         std::make_shared<CPUPinnedAllocator>();
@@ -1480,6 +1508,12 @@ class AllocatorFacadePrivate {
     if (!zero_size_allocators_.empty()) return;
     std::vector<phi::Place> places;
     places.emplace_back(phi::CPUPlace());
+#ifdef PADDLE_WITH_MPS
+    int mps_device_count = phi::backends::mps::GetMPSDeviceCount();
+    for (int i = 0; i < mps_device_count; ++i) {
+      places.emplace_back(phi::MPSPlace(i));
+    }
+#endif
 #if defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)
     int device_count = platform::GetGPUDeviceCount();
     for (int dev_id = 0; dev_id < device_count; ++dev_id) {

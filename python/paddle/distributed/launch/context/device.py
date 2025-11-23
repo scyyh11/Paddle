@@ -23,6 +23,7 @@ class DeviceType:
     CPU = 'cpu'
     GPU = 'gpu'
     XPU = 'xpu'
+    MPS = 'mps'
     IPU = 'ipu'
     CUSTOM_DEVICE = 'custom_device'
 
@@ -68,6 +69,8 @@ class Device:
             return 'FLAGS_selected_gpus'
         if self._dtype == DeviceType.XPU:
             return 'FLAGS_selected_xpus'
+        if self._dtype == DeviceType.MPS:
+            return 'FLAGS_selected_mps'
         if self._dtype == DeviceType.IPU:
             return 'FLAGS_selected_ipus'
         if self._dtype == DeviceType.CUSTOM_DEVICE:
@@ -151,6 +154,10 @@ class Device:
             dev._dtype = DeviceType.XPU
             num = core.get_xpu_device_count()
             visible_devices = os.getenv("XPU_VISIBLE_DEVICES")
+        elif core.is_compiled_with_mps():
+            dev._dtype = DeviceType.MPS
+            num = core.get_mps_device_count()
+            visible_devices = os.getenv("MPS_VISIBLE_DEVICES")
         elif core.is_compiled_with_ipu():
             dev._dtype = DeviceType.IPU
             num = core.get_ipu_device_count()

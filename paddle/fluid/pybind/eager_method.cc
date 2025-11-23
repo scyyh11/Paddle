@@ -252,7 +252,7 @@ static PyObject* tensor_method_numpy(TensorObject* self,
   phi::CPUPlace cpu_place;
 
   if (self->tensor.is_cpu() || self->tensor.is_gpu_pinned() ||
-      self->tensor.is_xpu_pinned()) {
+      self->tensor.is_xpu_pinned() || self->tensor.is_mps()) {
     eager_gil_scoped_release guard;
     phi::CPUPlace place;
     if (self->tensor.is_selected_rows()) {

@@ -368,6 +368,16 @@ KernelResult KernelFactory::SelectKernelOrThrowError(
       (kernel_iter == iter->second.end() ||
        phi::backends::custom_device::is_in_custom_black_list(
            TransToFluidOpName(kernel_name)))
+#elif defined(PADDLE_WITH_MPS)
+  // MPS fallback to CPU when kernel is not found
+  if (FLAGS_enable_api_kernel_fallback &&
+      kernel_key.backend() == Backend::MPS &&
+      kernel_iter == iter->second.end()
+#elif defined(PADDLE_WITH_IPU)
+  // IPU fallback to CPU when kernel is not found
+  if (FLAGS_enable_api_kernel_fallback &&
+      kernel_key.backend() == Backend::IPU &&
+      kernel_iter == iter->second.end()
 #else
   if ((FLAGS_enable_api_kernel_fallback && kernel_iter == iter->second.end())
 #endif

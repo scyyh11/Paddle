@@ -120,6 +120,15 @@ phi::KernelKey FallBackToCpu(const phi::KernelKey& kernel_key,
         phi::Backend::CPU, kernel_key.layout(), kernel_key.dtype());
   }
 #endif
+#ifdef PADDLE_WITH_MPS
+  if (kernel_key.backend() == phi::Backend::MPS) {
+    VLOG(3) << "phi missing MPS kernel: " << op.Type()
+            << ", expected_kernel_key:" << kernel_key
+            << ", fallback to CPU one!";
+    return phi::KernelKey(
+        phi::Backend::CPU, kernel_key.layout(), kernel_key.dtype());
+  }
+#endif
 #ifdef PADDLE_WITH_CUSTOM_DEVICE
   auto place = phi::TransToPhiPlace(kernel_key.backend());
   bool is_custom_place = phi::is_custom_place(place);

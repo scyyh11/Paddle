@@ -22,6 +22,9 @@ limitations under the License. */
 #include "paddle/phi/backends/device_manager.h"
 #include "paddle/phi/backends/gpu/gpu_info.h"
 #include "paddle/phi/backends/xpu/xpu_info.h"
+#ifdef PADDLE_WITH_MPS
+#include "paddle/phi/backends/mps/mps_info.h"
+#endif
 
 namespace phi {
 
@@ -41,6 +44,8 @@ const char *AllocationTypeStr(AllocationType type) {
       return "xpu_pinned";
     case AllocationType::IPU:
       return "ipu";
+    case AllocationType::MPS:
+      return "mps";
     case AllocationType::CUSTOM:
       return "custom_device";
     default:
@@ -98,8 +103,13 @@ Place GetPinnedPlace(const Place &place) {
       VLOG(10) << "XPUPinnedPlace";
       return phi::XPUPinnedPlace();
       break;
+    case AllocationType::MPS:
+      // MPS uses unified memory, so pinned place is same as MPS place
+      VLOG(10) << "MPSPlace (unified memory)";
+      return place;
+      break;
     default:
-      VLOG(10) << "Not GPU/XPU PinnedPlace";
+      VLOG(10) << "Not GPU/XPU/MPS PinnedPlace";
       return place;
   }
 }
@@ -187,6 +197,10 @@ bool is_ipu_place(const Place &p) {
   return p.GetType() == phi::AllocationType::IPU;
 }
 
+bool is_mps_place(const Place &p) {
+  return p.GetType() == phi::AllocationType::MPS;
+}
+
 TEST_API bool is_cpu_place(const Place &p) {
   return p.GetType() == phi::AllocationType::CPU;
 }
@@ -210,12 +224,12 @@ bool is_custom_place(const Place &p) {
 
 bool is_accelerat_place(const Place &p) {
   return is_gpu_place(p) || is_xpu_place(p) || is_ipu_place(p) ||
-         is_custom_place(p);
+         is_mps_place(p) || is_custom_place(p);
 }
 
 bool is_accelerat_allocation_type(AllocationType type) {
   return type == phi::AllocationType::GPU || type == phi::AllocationType::XPU ||
-         type == phi::AllocationType::IPU ||
+         type == phi::AllocationType::IPU || type == phi::AllocationType::MPS ||
          type == phi::AllocationType::CUSTOM;
 }
 
@@ -249,6 +263,8 @@ std::string PlaceHelper::GetDeviceType(const Place &place) {
     return "gpu";
   } else if (is_xpu_place(place)) {
     return "xpu";
+  } else if (is_mps_place(place)) {
+    return "mps";
   } else if (is_custom_place(place)) {
     return place.GetDeviceType();
   } else {
@@ -269,6 +285,8 @@ Place PlaceHelper::CreatePlace(const std::string &dev_type, size_t dev_id) {
     return GPUPlace(dev_id);
   } else if (dev_type == "xpu") {
     return XPUPlace(dev_id);
+  } else if (dev_type == "mps") {
+    return MPSPlace(dev_id);
   } else {
     return CustomPlace(dev_type, dev_id);
   }
@@ -308,6 +326,15 @@ phi::XPUPlace DefaultXPUPlace() {
   return phi::XPUPlace(
 #ifdef PADDLE_WITH_XPU
       phi::backends::xpu::GetXPUCurrentDeviceId());
+#else
+      0);
+#endif
+}
+
+phi::MPSPlace DefaultMPSPlace() {
+  return phi::MPSPlace(
+#ifdef PADDLE_WITH_MPS
+      phi::backends::mps::GetCurrentDeviceId());
 #else
       0);
 #endif

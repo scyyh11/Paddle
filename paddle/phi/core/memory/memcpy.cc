@@ -31,6 +31,13 @@ limitations under the License. */
 
 #include "paddle/common/flags.h"
 
+#ifdef PADDLE_WITH_MPS
+#include "paddle/phi/backends/mps/mps_copy.h"
+#include "paddle/phi/backends/mps/mps_context.h"
+#include "paddle/phi/backends/mps/mps_info.h"
+#include "paddle/phi/core/platform/device_context.h"
+#endif
+
 COMMON_DECLARE_bool(use_default_stream);
 
 namespace paddle::memory {
@@ -122,6 +129,53 @@ PADDLE_API void Copy<phi::CPUPlace, phi::CPUPlace>(
   VLOG(4) << "src: " << src << ", dst: " << dst << ", num: " << num;
   std::memcpy(dst, src, num);
 }
+
+#ifdef PADDLE_WITH_MPS
+// MPS memcpy implementation following PyTorch's approach.
+// PyTorch uses Metal's blit command encoder for MPS copies, but since we're
+// using unified memory (MTLResourceStorageModeShared), memcpy is also efficient.
+// We use memcpy for simplicity, which matches PyTorch's behavior for unified memory.
+template <>
+void Copy<phi::MPSPlace, phi::CPUPlace>(phi::MPSPlace dst_place,
+                                        void* dst,
+                                        phi::CPUPlace src_place,
+                                        const void* src,
+                                        size_t num) {
+  if (UNLIKELY(num == 0)) return;
+  VLOG(4) << "memory::Copy " << num << " Bytes from " << src_place << " to "
+          << dst_place;
+  // For CPU -> MPS with unified memory, memcpy is efficient
+  // PyTorch also uses memcpy for unified memory scenarios
+  std::memcpy(dst, src, num);
+}
+
+template <>
+void Copy<phi::CPUPlace, phi::MPSPlace>(phi::CPUPlace dst_place,
+                                        void* dst,
+                                        phi::MPSPlace src_place,
+                                        const void* src,
+                                        size_t num) {
+  if (UNLIKELY(num == 0)) return;
+  VLOG(4) << "memory::Copy " << num << " Bytes from " << src_place << " to "
+          << dst_place;
+  // For MPS -> CPU with unified memory, memcpy is efficient
+  std::memcpy(dst, src, num);
+}
+
+template <>
+void Copy<phi::MPSPlace, phi::MPSPlace>(phi::MPSPlace dst_place,
+                                        void* dst,
+                                        phi::MPSPlace src_place,
+                                        const void* src,
+                                        size_t num) {
+  if (UNLIKELY(num == 0)) return;
+  VLOG(4) << "memory::Copy " << num << " Bytes from " << src_place << " to "
+          << dst_place;
+  // For MPS -> MPS with unified memory, memcpy is efficient
+  // PyTorch uses Metal blit for this, but memcpy works well with unified memory
+  std::memcpy(dst, src, num);
+}
+#endif  // PADDLE_WITH_MPS
 
 #ifdef PADDLE_WITH_IPU
 template <>
@@ -867,6 +921,24 @@ PADDLE_API void Copy<phi::Place, phi::Place>(phi::Place dst_place,
     phi::GPUPlace place_src(src_place.GetDeviceId());
     return Copy(place_dst, dst, place_src, src, num, stream);
   }
+#ifdef PADDLE_WITH_MPS
+  else if (src_place.GetType() == phi::AllocationType::CPU &&
+           dst_place.GetType() == phi::AllocationType::MPS) {
+    phi::MPSPlace place_dst(dst_place.GetDeviceId());
+    phi::CPUPlace place_src;
+    return Copy(place_dst, dst, place_src, src, num);
+  } else if (src_place.GetType() == phi::AllocationType::MPS &&
+             dst_place.GetType() == phi::AllocationType::CPU) {
+    phi::MPSPlace place_src(src_place.GetDeviceId());
+    phi::CPUPlace place_dst;
+    return Copy(place_dst, dst, place_src, src, num);
+  } else if (src_place.GetType() == phi::AllocationType::MPS &&
+             dst_place.GetType() == phi::AllocationType::MPS) {
+    phi::MPSPlace place_src(src_place.GetDeviceId());
+    phi::MPSPlace place_dst(dst_place.GetDeviceId());
+    return Copy(place_dst, dst, place_src, src, num);
+  }
+#endif  // PADDLE_WITH_MPS
 }
 
 // NOTE: only for (CPUPlace, CUDAPlace and CUDAPinnedPlace) -> (CPUPlace).
@@ -1081,6 +1153,24 @@ PADDLE_API void Copy<phi::Place, phi::Place>(phi::Place dst_place,
     return Copy(place_dst, dst, place_src, src, num, nullptr);
   }
 #endif
+#ifdef PADDLE_WITH_MPS
+  else if (src_place.GetType() == phi::AllocationType::CPU &&  // NOLINT
+           dst_place.GetType() == phi::AllocationType::MPS) {
+    phi::MPSPlace place_dst(dst_place.GetDeviceId());
+    phi::CPUPlace place_src;
+    return Copy(place_dst, dst, place_src, src, num);
+  } else if (src_place.GetType() == phi::AllocationType::MPS &&
+             dst_place.GetType() == phi::AllocationType::CPU) {
+    phi::MPSPlace place_src(src_place.GetDeviceId());
+    phi::CPUPlace place_dst;
+    return Copy(place_dst, dst, place_src, src, num);
+  } else if (src_place.GetType() == phi::AllocationType::MPS &&
+             dst_place.GetType() == phi::AllocationType::MPS) {
+    phi::MPSPlace place_src(src_place.GetDeviceId());
+    phi::MPSPlace place_dst(dst_place.GetDeviceId());
+    return Copy(place_dst, dst, place_src, src, num);
+  }
+#endif  // PADDLE_WITH_MPS
   else {  // NOLINT
     PADDLE_THROW(::common::errors::Unimplemented(
         "Copy from %s to %s is not supported.", src_place, dst_place));

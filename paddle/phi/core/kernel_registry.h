@@ -1492,6 +1492,8 @@ struct KernelRegistrar {
 #define _DEVICE GPU,
 #elif defined(PADDLE_WITH_XPU)
 #define _DEVICE XPU,
+#elif defined(PADDLE_WITH_MPS)
+#define _DEVICE MPS,
 #else
 #define _DEVICE
 #endif

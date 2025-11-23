@@ -143,6 +143,10 @@ limitations under the License. */
 #include "paddle/fluid/platform/device/ipu/ipu_info.h"
 #endif
 
+#ifdef PADDLE_WITH_MPS
+#include "paddle/phi/backends/mps/mps_info.h"
+#endif
+
 #ifdef PADDLE_WITH_CRYPTO
 #include "paddle/fluid/pybind/crypto.h"
 #endif
@@ -179,6 +183,7 @@ PyTypeObject *g_xpuplace_pytype = nullptr;
 PyTypeObject *g_cudapinnedplace_pytype = nullptr;
 PyTypeObject *g_xpupinnedplace_pytype = nullptr;
 PyTypeObject *g_ipuplace_pytype = nullptr;
+PyTypeObject *g_mpsplace_pytype = nullptr;
 
 template <typename PlaceType>
 static inline int PlaceIndex(const PlaceType &p) {  // NOLINT
@@ -201,12 +206,25 @@ void BindPlace(pybind11::module &m) {  // NOLINT
   py::class_<phi::Place> platformplace(m, "Place");
   g_place_pytype = reinterpret_cast<PyTypeObject *>(platformplace.ptr());
   platformplace.def(py::init<>())
+      .def(py::init<const phi::CPUPlace&>())
+      .def(py::init<const phi::GPUPlace&>())
+      .def(py::init<const phi::XPUPlace&>())
+      .def(py::init<const phi::IPUPlace&>())
+#ifdef PADDLE_WITH_MPS
+      .def(py::init<const phi::MPSPlace&>())
+#endif
+      .def(py::init<const phi::GPUPinnedPlace&>())
+      .def(py::init<const phi::XPUPinnedPlace&>())
+      .def(py::init<const phi::CustomPlace&>())
       .def("_type", &PlaceIndex<phi::Place>)
       .def("_equals", &IsSamePlace<phi::Place, phi::Place>)
       .def("_equals", &IsSamePlace<phi::Place, phi::GPUPlace>)
       .def("_equals", &IsSamePlace<phi::Place, phi::CPUPlace>)
       .def("_equals", &IsSamePlace<phi::Place, phi::XPUPlace>)
       .def("_equals", &IsSamePlace<phi::Place, phi::IPUPlace>)
+#ifdef PADDLE_WITH_MPS
+      .def("_equals", &IsSamePlace<phi::Place, phi::MPSPlace>)
+#endif
       .def("_equals", &IsSamePlace<phi::Place, phi::GPUPinnedPlace>)
       .def("_equals", &IsSamePlace<phi::Place, phi::XPUPinnedPlace>)
       .def("_equals", &IsSamePlace<phi::Place, phi::CustomPlace>)
@@ -227,6 +245,10 @@ void BindPlace(pybind11::module &m) {  // NOLINT
            [](phi::Place &self) { return phi::is_xpu_place(self); })
       .def("is_ipu_place",
            [](phi::Place &self) { return phi::is_ipu_place(self); })
+#ifdef PADDLE_WITH_MPS
+      .def("is_mps_place",
+           [](phi::Place &self) { return phi::is_mps_place(self); })
+#endif
       .def("is_cuda_pinned_place",
            [](phi::Place &self) { return phi::is_cuda_pinned_place(self); })
       .def("is_xpu_pinned_place",
@@ -236,6 +258,9 @@ void BindPlace(pybind11::module &m) {  // NOLINT
       .def("gpu_device_id", [](phi::Place &self) { return self.device; })
       .def("xpu_device_id", [](phi::Place &self) { return self.device; })
       .def("ipu_device_id", [](phi::Place &self) { return self.device; })
+#ifdef PADDLE_WITH_MPS
+      .def("mps_device_id", [](phi::Place &self) { return self.device; })
+#endif
       .def("custom_device_id", [](phi::Place &self) { return self.device; })
       .def("custom_device_type",
            [](phi::Place &self) { return self.GetDeviceType(); })
@@ -265,6 +290,12 @@ void BindPlace(pybind11::module &m) {  // NOLINT
            [](phi::Place &self, const phi::IPUPlace &ipu_place) {
              self = ipu_place;
            })
+#ifdef PADDLE_WITH_MPS
+      .def("set_place",
+           [](phi::Place &self, const phi::MPSPlace &mps_place) {
+             self = mps_place;
+           })
+#endif
       .def("set_place",
            [](phi::Place &self, const phi::CustomPlace &plug_place) {
              self = plug_place;
@@ -757,6 +788,49 @@ void BindPlace(pybind11::module &m) {  // NOLINT
       .def("_equals", &IsSamePlace<phi::IPUPlace, phi::GPUPinnedPlace>)
       .def("_equals", &IsSamePlace<phi::IPUPlace, phi::XPUPinnedPlace>)
       .def("__str__", string::to_string<const phi::IPUPlace &>);
+
+#ifdef PADDLE_WITH_MPS
+  // MPSPlace
+  py::class_<phi::MPSPlace, phi::Place> mpsplace(m, "MPSPlace", R"DOC(
+    MPSPlace is a descriptor of a device.
+    It represents an Apple Metal Performance Shaders device on which a tensor will be allocated and a model will run.
+
+    Examples:
+        .. code-block:: python
+
+            >>> # doctest: +REQUIRES(env:MPS)
+            >>> import paddle
+            >>> mps_place = paddle.MPSPlace(0)
+        )DOC");
+  g_mpsplace_pytype = reinterpret_cast<PyTypeObject *>(mpsplace.ptr());
+  mpsplace
+      .def("__init__",
+           [](phi::MPSPlace &self, int dev_id) {
+             if (phi::backends::mps::GetMPSDeviceCount() == 0) {
+               LOG(ERROR) << "Cannot use MPS because there is no MPS "
+                             "device detected on your machine.";
+               PADDLE_THROW(::common::errors::InvalidArgument(
+                   "use wrong place, Please check."));
+             }
+             new (&self) phi::MPSPlace(dev_id);
+           })
+      .def("get_device_id",
+           [](const phi::MPSPlace &self) { return self.GetDeviceId(); })
+      .def("_type", &PlaceIndex<phi::MPSPlace>)
+      .def("_equals", &IsSamePlace<phi::MPSPlace, phi::Place>)
+      .def("_equals", &IsSamePlace<phi::MPSPlace, phi::GPUPlace>)
+      .def("_equals", &IsSamePlace<phi::MPSPlace, phi::CPUPlace>)
+      .def("_equals", &IsSamePlace<phi::MPSPlace, phi::XPUPlace>)
+      .def("_equals", &IsSamePlace<phi::MPSPlace, phi::IPUPlace>)
+      .def("_equals", &IsSamePlace<phi::MPSPlace, phi::MPSPlace>)
+      .def("_equals", &IsSamePlace<phi::MPSPlace, phi::GPUPinnedPlace>)
+      .def("_equals", &IsSamePlace<phi::MPSPlace, phi::XPUPinnedPlace>)
+      .def("__repr__", string::to_string<const phi::MPSPlace &>)
+      .def("__str__", string::to_string<const phi::MPSPlace &>);
+  m.def("is_mps_place", [](const phi::Place &place) -> bool {
+    return phi::is_mps_place(place);
+  });
+#endif
 }
 
 }  // namespace paddle::pybind

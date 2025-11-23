@@ -491,6 +491,16 @@ void SetTensorFromPyArrayT(
         "Cannot use CustomDevice in CPU/GPU/XPU version. "
         "Please recompile or reinstall Paddle with CustomDevice support."));
 #endif
+  } else if (phi::is_mps_place(place)) {
+#ifdef PADDLE_WITH_MPS
+    // MPS uses unified memory, so we can use memcpy directly
+    auto dst = self->mutable_data<T>(place);
+    std::memcpy(dst, array.data(), array.nbytes());
+#else
+    PADDLE_THROW(common::errors::PermissionDenied(
+        "Cannot use MPSPlace in CPU/GPU/XPU version. "
+        "Please recompile or reinstall Paddle with MPS support."));
+#endif
   } else {
 #if defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)
     if (phi::is_gpu_place(place)) {

@@ -155,6 +155,15 @@ if(WITH_AVX
                "${Wno_Maybe_Uninitialized} ${FMA_FLAG} ${AVX512F_FLAG}")
 endif()
 
+if(WITH_MPS AND APPLE)
+  set_source_files_properties(
+    backends/mps/mps_context.mm
+    backends/mps/mps_info.mm
+    PROPERTIES
+      LANGUAGE OBJCXX
+      COMPILE_FLAGS "-fobjc-arc")
+endif()
+
 if(WITH_GPU)
   set_source_files_properties(
     backends/gpu/gpu_resources.cc
@@ -217,6 +226,23 @@ endif()
 # core/memory/allocation uses shm_unlink and requires the rt library
 if(UNIX AND NOT APPLE)
   target_link_libraries(phi_core rt)
+endif()
+
+# Link Metal frameworks and Objective-C runtime for MPS support
+if(WITH_MPS AND APPLE)
+  find_library(METAL_FRAMEWORK Metal)
+  find_library(METAL_PERFORMANCE_SHADERS_FRAMEWORK MetalPerformanceShaders)
+  find_library(FOUNDATION_FRAMEWORK Foundation)
+  
+  if(METAL_FRAMEWORK AND METAL_PERFORMANCE_SHADERS_FRAMEWORK AND FOUNDATION_FRAMEWORK)
+    target_link_libraries(phi_core
+      ${METAL_FRAMEWORK}
+      ${METAL_PERFORMANCE_SHADERS_FRAMEWORK}
+      ${FOUNDATION_FRAMEWORK}
+    )
+  else()
+    message(WARNING "Metal or Foundation frameworks not found. MPS support may not work correctly.")
+  endif()
 endif()
 
 set(PHI_DUMMY_FILE ${CMAKE_CURRENT_BINARY_DIR}/phi_dummy.cpp)

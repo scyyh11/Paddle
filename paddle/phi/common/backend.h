@@ -53,6 +53,7 @@ enum class Backend : uint8_t {
   // various acceleration devices' backends
   XPU,  // XPU currently does not exist at the same time as CUDA
   IPU,
+  MPS,  // Metal Performance Shaders (Apple Silicon)
 
   // paddle kernel primitives backend
   KPS,
@@ -102,6 +103,9 @@ inline std::ostream& operator<<(std::ostream& os, Backend backend) {
     case Backend::IPU:
       os << "IPU";
       break;
+    case Backend::MPS:
+      os << "MPS";
+      break;
     case Backend::CUSTOM:
       os << "CUSTOM";
       break;
@@ -148,6 +152,8 @@ inline Backend StringToBackend(const char* backend_cstr) {
 #endif
   } else if (s == std::string("IPU")) {
     return Backend::IPU;
+  } else if (s == std::string("MPS")) {
+    return Backend::MPS;
   } else if (s == std::string("Custom")) {
     return Backend::CUSTOM;
   } else {
@@ -175,6 +181,8 @@ inline std::string BackendToString(const Backend& backend) {
       return "KPS";
     case Backend::IPU:
       return "IPU";
+    case Backend::MPS:
+      return "MPS";
     case Backend::CUSTOM:
       return "CUSTOM";
     default: {
@@ -200,6 +208,8 @@ inline Backend get_accelerat_backend() {
   return Backend::XPU;
 #elif defined(PADDLE_WITH_IPU)
   return Backend::IPU;
+#elif defined(PADDLE_WITH_MPS)
+  return Backend::MPS;
 #elif defined(PADDLE_WITH_CUSTOM_DEVICE)
   return Backend::CUSTOM;
 #else

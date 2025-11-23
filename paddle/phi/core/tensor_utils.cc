@@ -19,6 +19,9 @@ limitations under the License. */
 #include "paddle/phi/api/lib/data_transform.h"
 #include "paddle/phi/backends/context_pool.h"
 #include "paddle/phi/backends/gpu/gpu_context.h"
+#ifdef PADDLE_WITH_MPS
+#include "paddle/phi/backends/mps/mps_context.h"
+#endif
 #include "paddle/phi/common/data_type.h"
 #include "paddle/phi/common/memory_utils.h"
 #include "paddle/phi/core/compat/convert_utils.h"
@@ -80,6 +83,10 @@ void Copy(const Context& dev_ctx,
 #endif
 #ifdef PADDLE_WITH_CUSTOM_DEVICE
   } else if (dst_place.GetType() == AllocationType::CUSTOM) {
+    dst_ptr = dev_ctx.Alloc(dst, src.dtype());
+#endif
+#ifdef PADDLE_WITH_MPS
+  } else if (dst_place.GetType() == AllocationType::MPS) {
     dst_ptr = dev_ctx.Alloc(dst, src.dtype());
 #endif
   }
@@ -276,6 +283,18 @@ void Copy(const Context& dev_ctx,
             ? nullptr
             : reinterpret_cast<const phi::CustomContext&>(dev_ctx).stream();
     memory_utils::Copy(dst_place, dst_ptr, src_place, src_ptr, size, stream);
+#endif
+#ifdef PADDLE_WITH_MPS
+  } else if ((src_place.GetType() == AllocationType::CPU ||
+              src_place.GetType() == AllocationType::MPS) &&  // NOLINT
+             (dst_place.GetType() == AllocationType::CPU ||
+              dst_place.GetType() == AllocationType::MPS)) {
+    // MPS uses unified memory, so CPU<->MPS copies are just memcpy
+    memory_utils::Copy(dst_place, dst_ptr, src_place, src_ptr, size);
+  } else if (src_place.GetType() == AllocationType::MPS &&  // NOLINT
+             dst_place.GetType() == AllocationType::MPS) {
+    // MPS to MPS copy (same device, unified memory)
+    memory_utils::Copy(dst_place, dst_ptr, src_place, src_ptr, size);
 #endif
   } else {
     PADDLE_THROW(errors::Unimplemented(
@@ -476,6 +495,34 @@ template void Copy(const OneDNNContext& dev_ctx,
                    bool blocking,
                    DenseTensor* dst);
 template void Copy(const OneDNNContext& dev_ctx,
+                   const TensorArray& src,
+                   Place dst_place,
+                   bool blocking,
+                   TensorArray* dst);
+#endif
+
+#ifdef PADDLE_WITH_MPS
+template PADDLE_API void Copy(const MPSContext& dev_ctx,
+                              const DenseTensor& src,
+                              Place dst_place,
+                              bool blocking,
+                              DenseTensor* dst);
+template void Copy(const MPSContext& dev_ctx,
+                   const SelectedRows& src,
+                   Place dst_place,
+                   bool blocking,
+                   SelectedRows* dst);
+template void Copy(const MPSContext& dev_ctx,
+                   const SparseCooTensor& src,
+                   Place dst_place,
+                   bool blocking,
+                   SparseCooTensor* dst);
+template void Copy(const MPSContext& dev_ctx,
+                   const SparseCsrTensor& src,
+                   Place dst_place,
+                   bool blocking,
+                   SparseCsrTensor* dst);
+template void Copy(const MPSContext& dev_ctx,
                    const TensorArray& src,
                    Place dst_place,
                    bool blocking,

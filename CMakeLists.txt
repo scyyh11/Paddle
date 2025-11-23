@@ -46,6 +46,11 @@ project(paddle CXX C)
 # enable language CUDA
 # TODO(Shibo Tao): remove find_package(CUDA) completely.
 find_package(CUDA QUIET)
+
+# enable language Objective-C++ for MPS support
+if(WITH_MPS AND APPLE)
+  enable_language(OBJCXX)
+endif()
 find_package(MKL CONFIG QUIET)
 option(WITH_ONEMKL "Compile PaddlePaddle with oneMKL" OFF)
 option(WITH_GPU "Compile PaddlePaddle with NVIDIA GPU" ${CUDA_FOUND})
@@ -61,6 +66,7 @@ option(WITH_XPU_FFT "Compile PaddlePaddle with BAIDU XPU FFT" ${WITH_XPU})
 option(WITH_WIN_DUMP_DBG "Compile with windows core dump debug mode" OFF)
 option(WITH_ROCM "Compile PaddlePaddle with ROCM platform" OFF)
 option(WITH_IPU "Compile PaddlePaddle with Graphcore IPU" OFF)
+option(WITH_MPS "Compile PaddlePaddle with Apple Metal Performance Shaders (MPS)" OFF)
 option(WITH_ONNXRUNTIME "Compile PaddlePaddle with ONNXRUNTIME" OFF)
 option(WITH_CUSPARSELT "Compile PaddlePaddle with CUSPARSELT" OFF)
 option(WITH_SETUP_INSTALL "Compile PaddlePaddle with setup.py" OFF)
@@ -123,6 +129,13 @@ if(WITH_GPU AND NOT APPLE)
   enable_language(CUDA)
   message(STATUS "CUDA compiler: ${CMAKE_CUDA_COMPILER}, version: "
                  "${CMAKE_CUDA_COMPILER_ID} ${CMAKE_CUDA_COMPILER_VERSION}")
+endif()
+
+# enable language Objective-C++ for MPS support
+if(WITH_MPS AND APPLE)
+  enable_language(OBJCXX)
+  message(STATUS "Objective-C++ compiler: ${CMAKE_OBJCXX_COMPILER}, version: "
+                 "${CMAKE_OBJCXX_COMPILER_ID} ${CMAKE_OBJCXX_COMPILER_VERSION}")
 endif()
 
 message(STATUS "CXX compiler: ${CMAKE_CXX_COMPILER}, version: "
@@ -617,6 +630,16 @@ if(WITH_NV_JETSON)
   set(WITH_ARM
       ON
       CACHE STRING "Set WITH_ARM=ON when compiling WITH_NV_JETSON=ON." FORCE)
+endif()
+
+if(WITH_MPS AND APPLE)
+  # MPS requires ARM architecture (Apple Silicon)
+  if(NOT WITH_ARM)
+    message(STATUS "MPS requires ARM architecture. Automatically enabling WITH_ARM=ON.")
+    set(WITH_ARM
+        ON
+        CACHE STRING "Set WITH_ARM=ON when compiling WITH_MPS=ON." FORCE)
+  endif()
 endif()
 
 if(WITH_ARM)

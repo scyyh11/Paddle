@@ -41,6 +41,9 @@ limitations under the License. */
 #include "paddle/phi/core/distributed/auto_parallel/placement_types.h"
 #include "paddle/phi/core/distributed/auto_parallel/process_mesh.h"
 #include "paddle/phi/core/string_tensor.h"
+#ifdef PADDLE_WITH_MPS
+#include "paddle/phi/backends/mps/mps_info.h"
+#endif
 
 using phi::distributed::DistTensor;
 using phi::distributed::DistTensorMeta;
@@ -177,6 +180,17 @@ void InitTensorWithNumpyValue(TensorObject* self,
         "PaddlePaddle should compile with XPU if use XPUPlace."));
 #endif
     SetTensorFromPyArray<phi::XPUPlace>(impl_ptr, array, place, zero_copy);
+  } else if (phi::is_mps_place(place)) {
+#ifdef PADDLE_WITH_MPS
+    phi::backends::mps::SetDeviceId(place.device);
+    VLOG(4) << "CurrentDeviceId: "
+            << phi::backends::mps::GetCurrentDeviceId() << " from "
+            << static_cast<int>(place.device);
+#else
+    PADDLE_THROW(common::errors::PreconditionNotMet(
+        "PaddlePaddle should compile with MPS if use MPSPlace."));
+#endif
+    SetTensorFromPyArray<phi::MPSPlace>(impl_ptr, array, place, zero_copy);
   } else if (phi::is_gpu_place(place)) {
 #if defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)
     phi::backends::gpu::SetDeviceId(place.device);
@@ -208,7 +222,7 @@ void InitTensorWithNumpyValue(TensorObject* self,
     PADDLE_THROW(common::errors::InvalidArgument(
         "Place should be one of "
         "CPUPlace/XPUPlace/CUDAPlace/"
-        "CUDAPinnedPlace/XPUPinnedPlace/CustomPlace"));
+        "CUDAPinnedPlace/XPUPinnedPlace/MPSPlace/CustomPlace"));
   }
 }
 

@@ -103,12 +103,19 @@ void InitTensorWithNumpyValue(const py::object& array,
   } else if (phi::is_cuda_pinned_place(place)) {
     SetTensorFromPyArray<phi::GPUPinnedPlace>(
         impl_ptr, array, place, zero_copy);
+  } else if (phi::is_mps_place(place)) {
+#ifdef PADDLE_WITH_MPS
+    SetTensorFromPyArray<phi::MPSPlace>(impl_ptr, array, place, zero_copy);
+#else
+    PADDLE_THROW(common::errors::PreconditionNotMet(
+        "PaddlePaddle should compile with MPS if use MPSPlace."));
+#endif
   } else if (phi::is_custom_place(place)) {
     SetTensorFromPyArray<phi::CustomPlace>(impl_ptr, array, place, zero_copy);
   } else {
     PADDLE_THROW(common::errors::InvalidArgument(
         "Place should be one of "
-        "CPUPlace/XPUPlace/CUDAPlace/CUDAPinnedPlace/CustomPlace"));
+        "CPUPlace/XPUPlace/CUDAPlace/CUDAPinnedPlace/MPSPlace/CustomPlace"));
   }
 }
 

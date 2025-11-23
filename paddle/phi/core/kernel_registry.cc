@@ -20,6 +20,9 @@
 #include "paddle/phi/core/custom_kernel.h"
 #include "paddle/phi/core/kernel_utils.h"
 #include "paddle/phi/core/vocab/string_array.h"
+#ifdef PADDLE_WITH_MPS
+#include "paddle/phi/backends/mps/mps_context.h"
+#endif
 
 namespace phi {
 
@@ -41,6 +44,9 @@ void SetKernelArgsDef(const std::vector<std::type_index>& args_type,
         || arg_type == std::type_index(typeid(const XPUContext&))
 #elif defined(PADDLE_WITH_XPU) && defined(PADDLE_WITH_XPU_KP)
           || arg_type == std::type_index(typeid(const KPSContext&))
+#endif
+#ifdef PADDLE_WITH_MPS
+        || arg_type == std::type_index(typeid(const MPSContext&))
 #endif
 #if defined(PADDLE_WITH_CUSTOM_DEVICE)
         || arg_type == std::type_index(typeid(const CustomContext&))) {

@@ -188,6 +188,10 @@ limitations under the License. */
 #include "paddle/phi/core/platform/device/xpu/xpu_profiler.h"
 #endif
 
+#ifdef PADDLE_WITH_MPS
+#include "paddle/phi/backends/mps/mps_info.h"
+#endif
+
 #ifdef PADDLE_WITH_CUSTOM_DEVICE
 #include "paddle/fluid/platform/profiler/custom_device/custom_tracer.h"
 #include "paddle/phi/backends/device_base.h"
@@ -392,6 +396,14 @@ bool IsCompiledWithCustomDevice(std::string device_type) {
 
 bool IsCompiledWithIPU() {
 #ifndef PADDLE_WITH_IPU
+  return false;
+#else
+  return true;
+#endif
+}
+
+bool IsCompiledWithMPS() {
+#ifndef PADDLE_WITH_MPS
   return false;
 #else
   return true;
@@ -3263,6 +3275,7 @@ All parameter, weight, gradient are variables in Paddle.
   m.def("is_compiled_with_custom_device", IsCompiledWithCustomDevice);
   m.def("is_compiled_with_ipu", IsCompiledWithIPU);
   m.def("is_compiled_with_xpu", IsCompiledWithXPU);
+  m.def("is_compiled_with_mps", IsCompiledWithMPS);
   m.def("is_compiled_with_mkldnn", IsCompiledWithONEDNN);  // deprecated
   m.def("is_compiled_with_onednn", IsCompiledWithONEDNN);
   m.def("is_compiled_with_nccl", IsCompiledWithNCCL);
@@ -3731,6 +3744,10 @@ All parameter, weight, gradient are variables in Paddle.
 
 #ifdef PADDLE_WITH_IPU
   m.def("get_ipu_device_count", platform::GetIPUDeviceCount);
+#endif
+
+#ifdef PADDLE_WITH_MPS
+  m.def("get_mps_device_count", phi::backends::mps::GetMPSDeviceCount);
 #endif
 
 #ifdef PADDLE_WITH_XPU

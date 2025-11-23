@@ -53,6 +53,10 @@ limitations under the License. */
 #include "paddle/fluid/platform/device/ipu/ipu_info.h"
 #endif
 
+#ifdef PADDLE_WITH_MPS
+#include "paddle/phi/backends/mps/mps_info.h"
+#endif
+
 #include "paddle/common/enforce.h"
 #include "paddle/common/flags.h"
 #include "paddle/phi/common/memory_utils.h"
@@ -198,6 +202,15 @@ void InitDevices() {
           << "Compiled with PADDLE_WITH_IPU, but no IPU found in runtime.";
     }
 #endif
+#ifdef PADDLE_WITH_MPS
+    try {
+      // use user specified MPS devices.
+      devices = phi::backends::mps::GetSelectedDevices();
+    } catch (const std::exception &exp) {
+      LOG(WARNING)
+          << "Compiled with PADDLE_WITH_MPS, but no MPS found in runtime.";
+    }
+#endif
     InitDevices(devices);
   });
 }
@@ -222,6 +235,9 @@ void InitDevices(const std::vector<int> devices) {
 #endif
 #ifdef PADDLE_WITH_IPU
     places.emplace_back(phi::IPUPlace(device));
+#endif
+#ifdef PADDLE_WITH_MPS
+    places.emplace_back(phi::MPSPlace(device));
 #endif
   }
   places.emplace_back(phi::CPUPlace());

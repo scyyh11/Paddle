@@ -268,6 +268,7 @@ from .framework import (  # noqa: F401
     CUDAPlace,
     CustomPlace,
     IPUPlace,
+    MPSPlace,
     ParamAttr,
     XPUPinnedPlace,
     XPUPlace,

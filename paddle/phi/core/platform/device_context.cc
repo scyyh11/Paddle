@@ -38,6 +38,10 @@ limitations under the License. */
 #include "paddle/phi/backends/xpu/xpu_context.h"
 #endif
 
+#ifdef PADDLE_WITH_MPS
+#include "paddle/phi/backends/mps/mps_context.h"
+#endif
+
 namespace paddle {
 namespace platform {
 
@@ -50,6 +54,8 @@ DeviceType Place2DeviceType(const phi::Place& place) {
     return platform::DeviceType::XPU;
   } else if (phi::is_ipu_place(place)) {
     return platform::DeviceType::IPU;
+  } else if (phi::is_mps_place(place)) {
+    return platform::DeviceType::CUSTOM_DEVICE;  // Use CUSTOM_DEVICE for now
   } else if (phi::is_custom_place(place)) {
     return platform::DeviceType::CUSTOM_DEVICE;
   } else {
@@ -125,6 +131,16 @@ inline std::unique_ptr<DeviceContext> CreateDeviceContext(
     dev_ctx->SetPinnedAllocator(
         instance.GetAllocator(phi::XPUPinnedPlace()).get());
     dev_ctx->SetGenerator(phi::DefaultXPUGenerator(p.GetDeviceId()).get());
+#endif
+#ifdef PADDLE_WITH_MPS
+  } else if (p.GetType() == phi::AllocationType::MPS) {
+    auto* mps_ctx = dynamic_cast<phi::MPSContext*>(dev_ctx);
+    // MPS uses unified memory, no separate stream needed for allocator
+    // SetDefaultStream is not needed/available for MPS
+    dev_ctx->SetAllocator(instance.GetAllocator(p).get());
+    // MPS uses unified memory, so pinned allocator is same as device allocator
+    dev_ctx->SetPinnedAllocator(instance.GetAllocator(p).get());
+    dev_ctx->SetGenerator(phi::DefaultCPUGenerator().get());
 #endif
 #ifdef PADDLE_WITH_CUSTOM_DEVICE
   } else if (p.GetType() == phi::AllocationType::CUSTOM) {
@@ -233,6 +249,19 @@ void EmplaceDeviceContexts(
       PADDLE_THROW(
           common::errors::Unimplemented("XPUPlace is not supported. Please "
                                         "re-compile with WITH_XPU option."));
+#endif
+    } else if (place.GetType() == phi::AllocationType::MPS) {
+#ifdef PADDLE_WITH_MPS
+      EmplaceDeviceContext<phi::MPSContext>(
+          place_to_device_context,
+          place,
+          disable_setting_default_stream_for_allocator,
+          /*unused*/ stream_priority,
+          set_to_default_stream);
+#else
+      PADDLE_THROW(
+          common::errors::Unimplemented("MPSPlace is not supported. Please "
+                                        "re-compile with WITH_MPS option."));
 #endif
     } else if (phi::is_xpu_pinned_place(place)) {
 #if defined(PADDLE_WITH_XPU)

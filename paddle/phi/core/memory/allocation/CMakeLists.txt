@@ -53,4 +53,8 @@ if(WITH_XPU)
        stream_safe_xpu_allocator.cc)
 endif()
 
+if(WITH_MPS)
+  list(APPEND ALLOCATOR_SRCS mps_allocator.mm)
+endif()
+
 collect_srcs(core_srcs SRCS ${ALLOCATOR_SRCS})

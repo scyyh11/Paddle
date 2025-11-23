@@ -112,6 +112,30 @@ elif core.is_compiled_with_xpu():
         reset_max_memory_reserved,
         set_rng_state,
     )
+elif core.is_compiled_with_mps():
+    from .mps import (
+        device_count,
+        synchronize,
+    )
+    # MPS doesn't have streams/events like CUDA/XPU, so use CPU fallbacks
+    from .cpu import (
+        get_rng_state,
+        manual_seed,
+        max_memory_allocated,
+        max_memory_reserved,
+        reset_max_memory_allocated,
+        reset_max_memory_reserved,
+        set_rng_state,
+    )
+    # Create dummy functions for compatibility
+    def empty_cache():
+        pass
+    def _get_device_properties(device=None):
+        return None
+    def _create_event_base():
+        return None
+    def _create_stream_base():
+        return None
 else:
     if hasattr(core, 'get_all_custom_device_type'):
         dev_types = core.get_all_custom_device_type()
@@ -156,6 +180,7 @@ __all__ = [
     'IPUPlace',
     'is_compiled_with_xpu',
     'is_compiled_with_ipu',
+    'is_compiled_with_mps',
     'is_compiled_with_cinn',
     'is_compiled_with_cuda',
     'is_compiled_with_rocm',
@@ -279,6 +304,23 @@ def is_compiled_with_xpu() -> bool:
 
     """
     return core.is_compiled_with_xpu()
+
+
+def is_compiled_with_mps() -> bool:
+    """
+
+    Whether paddle was built with WITH_MPS=ON to support Apple Metal Performance Shaders
+
+    Returns (bool): whether paddle was built with WITH_MPS=ON
+
+    Examples:
+        .. code-block:: python
+
+            >>> import paddle
+            >>> support_mps = paddle.device.is_compiled_with_mps()
+
+    """
+    return core.is_compiled_with_mps()
 
 
 def XPUPlace(dev_id: int) -> _XPUPlace:
@@ -430,12 +472,31 @@ def _convert_to_place(device: PlaceLike) -> Place:
                 "since PaddlePaddle is not compiled with IPU"
             )
         place = core.IPUPlace()
+    elif lower_device == 'mps':
+        if not core.is_compiled_with_mps():
+            raise ValueError(
+                "The device should not be 'mps', "
+                "since PaddlePaddle is not compiled with MPS"
+            )
+        selected_mps = os.getenv("FLAGS_selected_mpss", "0").split(",")
+        device_id = int(selected_mps[0])
+        place = core.MPSPlace(device_id)
     else:
         available_gpu_device = re.match(r'gpu:\d+', lower_device) or re.match(
             r'dcu:\d+', lower_device
         )
         available_xpu_device = re.match(r'xpu:\d+', lower_device)
-        if available_gpu_device:
+        available_mps_device = re.match(r'mps:\d+', lower_device)
+        if available_mps_device:
+            if not core.is_compiled_with_mps():
+                raise ValueError(
+                    f"The device should not be {available_mps_device}, since PaddlePaddle is "
+                    "not compiled with MPS"
+                )
+            device_info_list = device.split(':', 1)
+            device_id = int(device_info_list[1])
+            place = core.MPSPlace(device_id)
+        elif available_gpu_device:
             if not core.is_compiled_with_cuda():
                 raise ValueError(
                     f"The device should not be {available_gpu_device}, since PaddlePaddle is "
@@ -682,6 +743,9 @@ def get_device(input: paddle.Tensor = None) -> str | int:
     elif isinstance(place, core.IPUPlace):
         num_devices = core.get_ipu_device_count()
         device = f"ipus:{{0-{num_devices - 1}}}"
+    elif isinstance(place, core.MPSPlace):
+        device_id = place.get_device_id()
+        device = 'mps:' + str(device_id)
     elif isinstance(place, core.CustomPlace):
         device_id = place.get_device_id()
         device_type = place.get_device_type()

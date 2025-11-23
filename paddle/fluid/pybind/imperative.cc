@@ -140,7 +140,7 @@ static const phi::Place PyObjectToPlace(const py::object &place_obj) {
     PADDLE_THROW(common::errors::InvalidArgument(
         "Place should be one of "
         "Place/CPUPlace/XPUPlace/CUDAPlace/CUDAPinnedPlace/IPUPlace/"
-        "XPUPinnedPlace/CustomPlace"));
+        "XPUPinnedPlace/MPSPlace/CustomPlace"));
   }
 }
 
@@ -188,13 +188,20 @@ static void InitVarBaseAndTensor(imperative::VarBase *self,
     SetTensorFromPyArray<phi::XPUPinnedPlace>(tensor, array, place, zero_copy);
   } else if (phi::is_ipu_place(place)) {
     SetTensorFromPyArray<phi::IPUPlace>(tensor, array, place, zero_copy);
+  } else if (phi::is_mps_place(place)) {
+#ifdef PADDLE_WITH_MPS
+    SetTensorFromPyArray<phi::MPSPlace>(tensor, array, place, zero_copy);
+#else
+    PADDLE_THROW(common::errors::PreconditionNotMet(
+        "PaddlePaddle should compile with MPS if use MPSPlace."));
+#endif
   } else if (phi::is_custom_place(place)) {
     SetTensorFromPyArray<phi::CustomPlace>(tensor, array, place, zero_copy);
   } else {
     PADDLE_THROW(common::errors::InvalidArgument(
         "Place should be one of "
         "CPUPlace/XPUPlace/CUDAPlace/CUDAPinnedPlace/"
-        "XPUPinnedPlace/IPUPlace/"));
+        "XPUPinnedPlace/IPUPlace/MPSPlace/"));
   }
   self->SetDataType(framework::TransToProtoVarType(tensor->dtype()));
 }

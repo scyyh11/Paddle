@@ -52,6 +52,10 @@ class DenseTensor;
 #include "paddle/phi/core/platform/device/xpu/xpu_op_list.h"
 #endif
 
+#ifdef PADDLE_WITH_MPS
+#include "paddle/phi/backends/mps/mps_info.h"
+#endif
+
 #ifdef PADDLE_WITH_DNNL
 #include "paddle/fluid/platform/onednn_helper.h"
 #include "paddle/phi/core/platform/onednn_op_list.h"
@@ -802,6 +806,16 @@ void OperatorBase::Run(const Scope& scope, const phi::Place& place) {
 #else
       auto dev_id = place.device;
       platform::SetXPUDeviceId(dev_id);
+#endif
+    } else if (phi::is_mps_place(place)) {
+#ifndef PADDLE_WITH_MPS
+      PADDLE_THROW(common::errors::Unavailable(
+          "Cannot run operator on place %s, please recompile paddle or "
+          "reinstall Paddle with MPS support.",
+          place));
+#else
+      auto dev_id = place.device;
+      phi::backends::mps::SetDeviceId(dev_id);
 #endif
     } else if (phi::is_custom_place(place)) {
 #ifndef PADDLE_WITH_CUSTOM_DEVICE
@@ -2404,6 +2418,17 @@ void OperatorWithKernel::ChooseKernel(const ExecutionContext& ctx) const {
   if (kernel_iter == kernels.end() &&
       phi::is_ipu_place(expected_kernel_key.place_)) {
     VLOG(3) << "missing IPU kernel: " << type_
+            << ", expected_kernel_key:" << expected_kernel_key
+            << ", fallbacking to CPU one!";
+    expected_kernel_key.place_ = phi::CPUPlace();
+    kernel_iter = kernels.find(expected_kernel_key);
+  }
+#endif
+
+#ifdef PADDLE_WITH_MPS
+  if (kernel_iter == kernels.end() &&
+      phi::is_mps_place(expected_kernel_key.place_)) {
+    VLOG(3) << "missing MPS kernel: " << type_
             << ", expected_kernel_key:" << expected_kernel_key
             << ", fallbacking to CPU one!";
     expected_kernel_key.place_ = phi::CPUPlace();

@@ -106,6 +106,23 @@ if(WITH_IPU)
   add_definitions(-DPADDLE_WITH_IPU)
 endif()
 
+if(WITH_MPS)
+  if(APPLE)
+    message(STATUS "Compile with MPS!")
+    add_definitions(-DPADDLE_WITH_MPS)
+    # MPS requires ARM architecture (Apple Silicon)
+    if(NOT WITH_ARM)
+      message(STATUS "MPS requires ARM architecture. Automatically enabling WITH_ARM=ON.")
+      set(WITH_ARM
+          ON
+          CACHE STRING "Set WITH_ARM=ON when compiling WITH_MPS=ON." FORCE)
+    endif()
+  else()
+    message(WARNING "MPS is only available on macOS. Disabling MPS support.")
+    set(WITH_MPS OFF)
+  endif()
+endif()
+
 if(WITH_GPU)
   add_definitions(-DPADDLE_WITH_CUDA)
   add_definitions(-DEIGEN_USE_GPU)

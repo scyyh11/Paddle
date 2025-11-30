@@ -145,6 +145,18 @@ MPS uses unified memory architecture (MTLResourceStorageModeShared), meaning:
 5. **Kernel Coverage**: Currently, operations fallback to CPU kernels. MPS-specific kernels need to be implemented for optimal performance
 6. **Implementation Language**: Uses Objective-C++ (`.mm` files) for Metal API interaction
 
+## Development Roadmap
+
+For detailed development plans, implementation phases, and checklists, see **[ROADMAP.md](ROADMAP.md)**.
+
+The roadmap includes:
+- ✅ Current status and completed infrastructure
+- 📋 Phase-by-phase implementation plan
+- 🎯 Dtype implementation strategy
+- 🧪 Testing requirements
+- ⚡ Performance targets
+- 📅 Timeline estimates
+
 ## Future Enhancements
 
 - [ ] MPS-specific kernel implementations using Metal Performance Shaders
@@ -156,6 +168,8 @@ MPS uses unified memory architecture (MTLResourceStorageModeShared), meaning:
 - [ ] Collective communication support (if needed for distributed training)
 - [ ] Profiling and performance tools integration
 - [ ] Buddy allocator implementation for better memory management
+
+**See [ROADMAP.md](ROADMAP.md) for detailed development plans.**
 
 ## Implementation Files
 
